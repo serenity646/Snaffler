@@ -1,0 +1,61 @@
+name: Build Snaffler
+on:
+push:
+branches: [ main, master ]
+pull_request:
+branches: [ main, master ]
+workflow_dispatch:
+jobs:
+build:
+runs-on: windows-latest
+steps:
+- name: Checkout code
+  uses: actions/checkout@v4
+
+- name: Setup .NET
+  uses: actions/setup-dotnet@v4
+  with:
+    dotnet-version: '8.0.x'
+
+- name: Restore dependencies
+  run: dotnet restore Snaffler.sln
+
+- name: Build
+  run: dotnet build Snaffler.sln --configuration Release --no-restore
+
+- name: Publish win-x64
+  run: |
+    dotnet publish Snaffler/Snaffler.csproj `
+      --configuration Release `
+      --runtime win-x64 `
+      --self-contained true `
+      --output ./publish/win-x64 `
+      -p:PublishSingleFile=true `
+      -p:PublishTrimmed=true
+
+- name: Publish win-x86
+  run: |
+    dotnet publish Snaffler/Snaffler.csproj `
+      --configuration Release `
+      --runtime win-x86 `
+      --self-contained true `
+      --output ./publish/win-x86 `
+      -p:PublishSingleFile=true `
+      -p:PublishTrimmed=true
+
+- name: Create zip archives
+  run: |
+    Compress-Archive -Path ./publish/win-x64/* -DestinationPath Snaffler-win-x64.zip
+    Compress-Archive -Path ./publish/win-x86/* -DestinationPath Snaffler-win-x86.zip
+
+- name: Upload x64 artifact
+  uses: actions/upload-artifact@v4
+  with:
+    name: Snaffler-win-x64
+    path: Snaffler-win-x64.zip
+
+- name: Upload x86 artifact
+  uses: actions/upload-artifact@v4
+  with:
+    name: Snaffler-win-x86
+    path: Snaffler-win-x86.zip
