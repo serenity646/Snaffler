@@ -1,0 +1,100 @@
+strategy:
+  matrix:
+    configuration: [Release, Debug]
+    framework: [net6.0, net7.0, net8.0]
+
+steps:
+- name: Checkout repository
+  uses: actions/checkout@v4
+  with:
+    submodules: recursive
+
+- name: Setup .NET
+  uses: actions/setup-dotnet@v4
+  with:
+    dotnet-version: |
+      6.0.x
+      7.0.x
+      8.0.x
+
+- name: Restore dependencies
+  run: dotnet restore Snaffler.sln
+
+- name: Build Snaffler
+  run: dotnet build Snaffler.sln --configuration ${{ matrix.configuration }} --framework ${{ matrix.framework }} --no-restore
+
+- name: Publish Self-Contained Executable (Windows x64)
+  run: |
+    dotnet publish Snaffler/Snaffler.csproj `
+      --configuration ${{ matrix.configuration }} `
+      --framework ${{ matrix.framework }} `
+      --runtime win-x64 `
+      --self-contained true `
+      --output ./publish/win-x64 `
+      -p:PublishSingleFile=true `
+      -p:PublishTrimmed=true `
+      -p:IncludeNativeLibrariesForSelfExtract=true
+
+- name: Publish Self-Contained Executable (Windows x86)
+  run: |
+    dotnet publish Snaffler/Snaffler.csproj `
+      --configuration ${{ matrix.configuration }} `
+      --framework ${{ matrix.framework }} `
+      --runtime win-x86 `
+      --self-contained true `
+      --output ./publish/win-x86 `
+      -p:PublishSingleFile=true `
+      -p:PublishTrimmed=true `
+      -p:IncludeNativeLibrariesForSelfExtract=true
+
+- name: Publish Framework-Dependent Executable
+  run: |
+    dotnet publish Snaffler/Snaffler.csproj `
+      --configuration ${{ matrix.configuration }} `
+      --framework ${{ matrix.framework }} `
+      --output ./publish/framework-dependent
+
+- name: List output files
+  run: |
+    Write-Host "=== Win-x64 Self-Contained ==="
+    Get-ChildItem -Path ./publish/win-x64 -Recurse | Select-Object Name, Length
+    Write-Host "`n=== Win-x86 Self-Contained ==="
+    Get-ChildItem -Path ./publish/win-x86 -Recurse | Select-Object Name, Length
+    Write-Host "`n=== Framework-Dependent ==="
+    Get-ChildItem -Path ./publish/framework-dependent -Recurse | Select-Object Name, Length
+
+- name: Create archive (win-x64)
+  run: |
+    Compress-Archive -Path ./publish/win-x64/* `
+      -DestinationPath Snaffler-${{ matrix.configuration }}-${{ matrix.framework }}-win-x64.zip
+
+- name: Create archive (win-x86)
+  run: |
+    Compress-Archive -Path ./publish/win-x86/* `
+      -DestinationPath Snaffler-${{ matrix.configuration }}-${{ matrix.framework }}-win-x86.zip
+
+- name: Create archive (framework-dependent)
+  run: |
+    Compress-Archive -Path ./publish/framework-dependent/* `
+      -DestinationPath Snaffler-${{ matrix.configuration }}-${{ matrix.framework }}-framework.zip
+
+- name: Upload x64 artifact
+  uses: actions/upload-artifact@v4
+  with:
+    name: Snaffler-${{ matrix.configuration }}-${{ matrix.framework }}-win-x64
+    path: Snaffler-${{ matrix.configuration }}-${{ matrix.framework }}-win-x64.zip
+    retention-days: 30
+
+- name: Upload x86 artifact
+  uses: actions/upload-artifact@v4
+  with:
+    name: Snaffler-${{ matrix.configuration }}-${{ matrix.framework }}-win-x86
+    path: Snaffler-${{ matrix.configuration }}-${{ matrix.framework }}-win-x86.zip
+    retention-days: 30
+
+- name: Upload framework-dependent artifact
+  uses: actions/upload-artifact@v4
+  with:
+    name: Snaffler-${{ matrix.configuration }}-${{ matrix.framework }}-framework
+    path: Snaffler-${{ matrix.configuration }}-${{ matrix.framework }}-framework.zip
+    retention-days: 30
