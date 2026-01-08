@@ -1,0 +1,43 @@
+name: Build Snaffler
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+    
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v2
+    
+    - name: Restore NuGet packages
+      run: nuget restore Snaffler.sln
+    
+    - name: Build with MSBuild
+      run: msbuild Snaffler.sln /p:Configuration=Release /p:Platform="Any CPU"
+    
+    - name: List build output
+      run: |
+        Write-Host "=== Build Output ==="
+        Get-ChildItem -Path ./Snaffler/bin/Release -Recurse | Select-Object Name, Length
+    
+    - name: Create zip archive
+      run: |
+        Compress-Archive -Path ./Snaffler/bin/Release/* -DestinationPath Snaffler-Release.zip
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: Snaffler-Release
+        path: Snaffler-Release.zip
